@@ -34,6 +34,7 @@ All rights reserved.
 import hashlib
 from logging import Logger
 import os
+import shlex
 import subprocess
 import sys
 import time
@@ -54,6 +55,7 @@ from .lib.utils import format_colors as fc
 from .constants import FONTS
 from .install.finder import open_exe_name_dialog
 from .lib.process import is_running
+from .lib.scrcpy_options import ScrcpyOptions
 from .lib.toolkit import UXMapper
 from .lib.utils import log, get_self
 from .platform import platform
@@ -73,6 +75,12 @@ root_logger = make_logger("root")
 
 
 environment = platform.System()
+SCRCPY_ROTATION_VALUES = {
+    1: "0",
+    2: "90",
+    3: "180",
+    4: "270",
+}
 
 # ============================================================================
 # Load cairo-svg conditionally
@@ -937,6 +945,7 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
 
         # 1: reset
         self.options = ""
+        scrcpy_options = ScrcpyOptions()
         progress = self.progress(0)
         self.__reset_message_box_stylesheet()
 
@@ -967,21 +976,14 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
             self.config["dimension"] = int(self.dimensionSlider.value())
             self.dimensionSlider.setValue(self.config["dimension"])
             self.dimensionText.setText(str(self.config["dimension"]) + "px")
-        # edit configuration files to update dimension key
-        if self.config["dimension"] is None:
-            self.options = " "
-        elif self.config["dimension"] is not None:
-            self.options = " -m " + str(self.config["dimension"])
-        else:
-            self.options = ""
+        scrcpy_options.max_size = self.config["dimension"]
         progress = self.progress(progress)
 
         # ====================================================================
         # 5: Check if always_on and fullscreen switches are on
-        if self.aotop.isChecked():
-            self.options += " --always-on-top"
+        scrcpy_options.always_on_top = self.aotop.isChecked()
         if self.fullscreen.isChecked():
-            self.options += " -f"
+            scrcpy_options.fullscreen = True
             self.config["fullscreen"] = True
         else:
             self.config["fullscreen"] = False
@@ -990,7 +992,7 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
         # ====================================================================
         # 6: Check if show touches / recording are on
         if self.showTouches.isChecked():
-            self.options += " --show-touches"
+            scrcpy_options.show_touches = True
             self.config["swtouches"] = True
         else:
             self.config["swtouches"] = False
@@ -999,13 +1001,13 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
         # ====================================================================
         # 7: Check if the record option is selected
         if self.recScui.isChecked():
-            self.options += " -r " + str(int(time.time())) + ".mp4 "
+            scrcpy_options.record = str(int(time.time())) + ".mp4"
         progress = self.progress(progress)
 
         # ====================================================================
         # 8: Check if the display is forced to be on
         if self.displayForceOn.isChecked():
-            self.options += " -S"
+            scrcpy_options.turn_screen_off = True
             self.config["dispRO"] = True
         else:
             self.config["dispRO"] = False
@@ -1032,7 +1034,9 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
             bitrate_integer = int(self.bitrateText.text().split()[0])
         else:
             bitrate_integer = 8000
-        self.options += " -b {}{}".format(bitrate_integer, bitrate_multiplier)
+        scrcpy_options.video_bit_rate = "{}{}".format(
+            bitrate_integer, bitrate_multiplier
+        )
         self.config["bitrate"] = bitrate_integer
         progress = self.progress(progress)
 
@@ -1041,7 +1045,6 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
         # or in the data provided by the user
         self.logger.info("Connection established")
         self.progressBar.setValue(50)
-        self.logger.debug("Flags passed to scrcpy engine : " + self.options)
         self.progressBar.setValue(60)
         self.config["extra"] = self.flaglineedit.text()
         progress = self.progress(progress)
@@ -1138,15 +1141,15 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
         # 16: Update device specific configuration
         model, identifier = self.current_device_identifier()
         # ====================================================================
-        # 17: Parse rotation (scrcpy v1.13+)
-        rotation_index = self.device_rotation.currentIndex() - 1
-        if self.lock_rotation.isChecked():
-            rotation_parameter = "--lock-video-orientation"
-        else:
-            rotation_parameter = "--rotation"
-        if rotation_index != -1:
-            self.options += " {} {}".format(rotation_parameter, rotation_index)
-            self.config["device"][identifier]["rotation"] = rotation_index + 1
+        # 17: Parse orientation (scrcpy 4.0+)
+        rotation_index = self.device_rotation.currentIndex()
+        rotation_value = SCRCPY_ROTATION_VALUES.get(rotation_index)
+        if rotation_value is not None:
+            if self.lock_rotation.isChecked():
+                scrcpy_options.capture_orientation = "@{}".format(rotation_value)
+            else:
+                scrcpy_options.display_orientation = rotation_value
+            self.config["device"][identifier]["rotation"] = rotation_index
         else:
             self.config["device"][identifier]["rotation"] = 0
 
@@ -1161,23 +1164,26 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
         if self.cmx is not None:
             self.config["cmx"] = " ".join(map(str, self.cmx))
 
-        arguments_scrcpy = [
-            i
-            for i in "{} {} {}".format(
-                self.options, self.config["extra"], self.config["cmx"]
-            ).split()
-            if i != ""
-        ]
-        progress = self.progress(progress)
-
-        # ====================================================================
-        # 18: Handle more devices
         if more_devices:
             # guiscrcpy found more devices
             # scrcpy will fail if more than one device is found
             # its important to pass the device serial id, if more than one
             # device is found
-            arguments_scrcpy = ["-s", device_id] + arguments_scrcpy
+            scrcpy_options.serial = device_id
+
+        try:
+            arguments_scrcpy = (
+                scrcpy_options.to_args()
+                + shlex.split(self.config["extra"])
+                + shlex.split(self.config["cmx"])
+            )
+        except ValueError as err:
+            self.logger.warning("Invalid scrcpy arguments: {}".format(err))
+            self.display_public_message("Invalid scrcpy arguments: {}".format(err))
+            return False
+        self.options = " ".join(arguments_scrcpy)
+        self.logger.debug("Flags passed to scrcpy engine : " + self.options)
+        progress = self.progress(progress)
 
         # tell end users that the color of the device is this
         self.display_public_message(

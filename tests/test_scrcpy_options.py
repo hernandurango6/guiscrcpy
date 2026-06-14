@@ -95,6 +95,16 @@ class ScrcpyOptionsTest(unittest.TestCase):
             ],
         )
 
+    def test_builds_display_and_capture_orientation_options(self):
+        self.assertEqual(
+            ScrcpyOptions(display_orientation="90").to_args(),
+            ["--display-orientation", "90"],
+        )
+        self.assertEqual(
+            ScrcpyOptions(capture_orientation="@90").to_args(),
+            ["--capture-orientation", "@90"],
+        )
+
     def test_rejects_invalid_choices(self):
         with self.assertRaisesRegex(ValueError, "video_codec"):
             ScrcpyOptions(video_codec="vp9").to_args()
