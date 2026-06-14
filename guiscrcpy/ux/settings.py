@@ -21,12 +21,15 @@ from PyQt5 import QtCore
 from PyQt5.QtWidgets import (
     QCheckBox,
     QComboBox,
+    QApplication,
     QDialog,
     QFileDialog,
     QGridLayout,
     QGroupBox,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -36,6 +39,7 @@ from PyQt5.QtWidgets import (
     QHBoxLayout,
 )
 
+from guiscrcpy.lib.scrcpy_apps import parse_scrcpy_apps
 from guiscrcpy.ux import Ui_SettingsWindow
 
 
@@ -112,6 +116,7 @@ class InterfaceSettings(QMainWindow, Ui_SettingsWindow):
         self.keep_active = QCheckBox("Keep active", self.modern_group)
         self.start_app = QLineEdit(self.modern_group)
         self.start_app.setPlaceholderText("org.mozilla.firefox")
+        self.open_app_window_button = QPushButton("Open app window", self.modern_group)
 
         self.keyboard_mode = QComboBox(self.modern_group)
         self.keyboard_mode.addItems(["", "sdk", "uhid", "aoa", "disabled"])
@@ -152,7 +157,8 @@ class InterfaceSettings(QMainWindow, Ui_SettingsWindow):
         layout.addWidget(self.flex_display, 4, 3)
         layout.addWidget(self.keep_active, 4, 4)
         layout.addWidget(QLabel("Start app"), 5, 0)
-        layout.addWidget(self.start_app, 5, 1, 1, 5)
+        layout.addWidget(self.start_app, 5, 1, 1, 4)
+        layout.addWidget(self.open_app_window_button, 5, 5)
 
         layout.addWidget(QLabel("Keyboard"), 6, 0)
         layout.addWidget(self.keyboard_mode, 6, 1)
@@ -171,9 +177,8 @@ class InterfaceSettings(QMainWindow, Ui_SettingsWindow):
         self._load_scrcpy4_options()
         self.updatebutton.clicked.connect(self.complete)
         self.a6d1.clicked.connect(self.file_chooser)
-        self.list_apps_button.clicked.connect(
-            lambda: self._show_scrcpy_info("Apps", ["--list-apps"])
-        )
+        self.list_apps_button.clicked.connect(self._show_apps_dialog)
+        self.open_app_window_button.clicked.connect(self._open_start_app_window)
         self.list_cameras_button.clicked.connect(
             lambda: self._show_scrcpy_info("Cameras", ["--list-cameras"])
         )
@@ -185,20 +190,93 @@ class InterfaceSettings(QMainWindow, Ui_SettingsWindow):
         )
         self.show()
 
-    def _show_scrcpy_info(self, title, args):
+    def _open_start_app_window(self):
+        app_package = self.start_app.text().strip()
+        if not app_package:
+            QMessageBox.warning(self, "Apps", "Enter or select an Android app first.")
+            return
+        self.parent.launch_app_window(app_package, title=app_package)
+
+    def _show_apps_dialog(self):
         try:
-            output = self.parent.scrcpy.run_info(args)
+            output = self.parent.run_scrcpy_info_for_selected_device(["--list-apps"])
         except Exception as err:
-            QMessageBox.warning(self, title, "Could not run scrcpy: {}".format(err))
+            QMessageBox.warning(self, "Apps", "Could not run scrcpy: {}".format(err))
+            return
+        if output is None:
             return
 
+        apps = parse_scrcpy_apps(output)
+        if not apps:
+            self._show_text_dialog("Apps", output.strip() or "No output")
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Apps")
+        dialog.resize(720, 520)
+        layout = QVBoxLayout(dialog)
+        apps_list = QListWidget(dialog)
+        apps_list.setAlternatingRowColors(True)
+
+        for app in apps:
+            prefix = "system" if app.system else "user"
+            item = QListWidgetItem("{}\n{} ({})".format(app.name, app.package, prefix))
+            item.setData(QtCore.Qt.UserRole, app.package)
+            item.setData(QtCore.Qt.UserRole + 1, app.name)
+            apps_list.addItem(item)
+
+        buttons = QHBoxLayout()
+        use_button = QPushButton("Use", dialog)
+        open_button = QPushButton("Open window", dialog)
+        copy_button = QPushButton("Copy package", dialog)
+        close_button = QPushButton("Close", dialog)
+
+        def selected_item():
+            item = apps_list.currentItem()
+            if item is None:
+                QMessageBox.warning(dialog, "Apps", "Select an app first.")
+            return item
+
+        def use_selected():
+            item = selected_item()
+            if item is not None:
+                self.start_app.setText(item.data(QtCore.Qt.UserRole))
+
+        def open_selected():
+            item = selected_item()
+            if item is not None:
+                self.parent.launch_app_window(
+                    item.data(QtCore.Qt.UserRole),
+                    title=item.data(QtCore.Qt.UserRole + 1),
+                )
+
+        def copy_selected():
+            item = selected_item()
+            if item is not None:
+                QApplication.clipboard().setText(item.data(QtCore.Qt.UserRole))
+
+        apps_list.itemDoubleClicked.connect(lambda _: open_selected())
+        use_button.clicked.connect(use_selected)
+        open_button.clicked.connect(open_selected)
+        copy_button.clicked.connect(copy_selected)
+        close_button.clicked.connect(dialog.accept)
+
+        layout.addWidget(apps_list)
+        buttons.addWidget(use_button)
+        buttons.addWidget(open_button)
+        buttons.addWidget(copy_button)
+        buttons.addWidget(close_button)
+        layout.addLayout(buttons)
+        dialog.exec_()
+
+    def _show_text_dialog(self, title, text_output):
         dialog = QDialog(self)
         dialog.setWindowTitle(title)
         dialog.resize(720, 420)
         layout = QVBoxLayout(dialog)
         text = QTextEdit(dialog)
         text.setReadOnly(True)
-        text.setPlainText(output.strip() or "No output")
+        text.setPlainText(text_output)
         buttons = QHBoxLayout()
         copy_button = QPushButton("Copy", dialog)
         close_button = QPushButton("Close", dialog)
@@ -209,6 +287,17 @@ class InterfaceSettings(QMainWindow, Ui_SettingsWindow):
         buttons.addWidget(close_button)
         layout.addLayout(buttons)
         dialog.exec_()
+
+    def _show_scrcpy_info(self, title, args):
+        try:
+            output = self.parent.run_scrcpy_info_for_selected_device(args)
+        except Exception as err:
+            QMessageBox.warning(self, title, "Could not run scrcpy: {}".format(err))
+            return
+        if output is None:
+            return
+
+        self._show_text_dialog(title, output.strip() or "No output")
 
     @staticmethod
     def _set_combo(combo, value):

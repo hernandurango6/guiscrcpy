@@ -957,6 +957,80 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
                 more_devices = True
         return device_id, more_devices, _stat
 
+    def run_scrcpy_info_for_selected_device(self, args, timeout=15):
+        values_devices_list = self.scan_devices_update_list_view()
+        device = self.check_devices_status_and_select_first_if_only_one(
+            values_devices_list
+        )
+        if device is None or isinstance(device, int):
+            return None
+
+        device_id, _, _ = device
+        return self.scrcpy.run_info(["--serial", device_id] + args, timeout=timeout)
+
+    def launch_app_window(self, app_package, title=None):
+        """Launch an Android app in a separate scrcpy virtual display."""
+        app_package = (app_package or "").strip()
+        if not app_package:
+            self.display_public_message("Select an Android app to open")
+            return False
+
+        if self.scrcpy_capabilities and not self.scrcpy_capabilities.virtual_display:
+            self.display_public_message("scrcpy virtual displays are unavailable")
+            return False
+
+        values_devices_list = self.scan_devices_update_list_view()
+        device = self.check_devices_status_and_select_first_if_only_one(
+            values_devices_list
+        )
+        if device is None or isinstance(device, int):
+            return False
+
+        device_id, _, _ = device
+        config_options = self.config.get("scrcpy_options", {})
+        new_display = config_options.get("new_display")
+        if new_display is None:
+            new_display = ""
+
+        scrcpy_options = ScrcpyOptions(
+            serial=device_id,
+            new_display=new_display,
+            flex_display=bool(config_options.get("flex_display")),
+            keep_active=bool(config_options.get("keep_active")),
+            start_app=app_package,
+            window_title=title or app_package,
+            video_codec=config_options.get("video_codec"),
+            max_fps=config_options.get("max_fps"),
+            no_audio=bool(config_options.get("no_audio")),
+            audio_source=config_options.get("audio_source"),
+            audio_codec=config_options.get("audio_codec"),
+            keyboard=config_options.get("keyboard"),
+            mouse=config_options.get("mouse"),
+            gamepad=config_options.get("gamepad"),
+        )
+
+        try:
+            arguments_scrcpy = scrcpy_options.to_args() + shlex.split(
+                self.config.get("extra") or ""
+            )
+        except ValueError as err:
+            self.logger.warning("Invalid app window arguments: {}".format(err))
+            self.display_public_message("Invalid scrcpy arguments: {}".format(err))
+            return False
+
+        if not self.debug__no_scrcpy:
+            self.scrcpy.start(arguments_scrcpy, stdout=sys.stdout, stderr=sys.stderr)
+
+        self.display_public_message(
+            "Opened {} in a new scrcpy window".format(app_package)
+        )
+        self.logger.debug(
+            "App window flags passed to scrcpy engine: {}".format(
+                " ".join(arguments_scrcpy)
+            )
+        )
+        return True
+
     def start_act(self):
         """
         Main brain of guiscrcpy; handles what to do when
