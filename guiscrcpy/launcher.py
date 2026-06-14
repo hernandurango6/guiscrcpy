@@ -1174,8 +1174,8 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
         try:
             arguments_scrcpy = (
                 scrcpy_options.to_args()
-                + shlex.split(self.config["extra"])
-                + shlex.split(self.config["cmx"])
+                + shlex.split(self.config.get("extra") or "")
+                + shlex.split(self.config.get("cmx") or "")
             )
         except ValueError as err:
             self.logger.warning("Invalid scrcpy arguments: {}".format(err))
