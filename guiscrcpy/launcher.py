@@ -56,6 +56,7 @@ from .constants import FONTS
 from .install.finder import open_exe_name_dialog
 from .lib.process import is_running
 from .lib.scrcpy_options import ScrcpyOptions
+from .lib.scrcpy_version import version_at_least
 from .lib.toolkit import UXMapper
 from .lib.utils import log, get_self
 from .platform import platform
@@ -135,6 +136,8 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
         self.child_windows = list()
         self.options = ""
         self.logger.debug("Received configuration parameters: {}".format(config))
+        self.scrcpy_capabilities = None
+        self._check_scrcpy_backend()
         # ====================================================================
         # Rotation; read config, update UI
         self.device_rotation.setCurrentIndex(config.get("rotation", 0))
@@ -216,6 +219,26 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
         self.devices_view.setContextMenuPolicy(QtCore.Qt.CustomContextMenu)
         self.scan_config_devices_update_list_view()
         self.refresh_devices()
+
+    def _check_scrcpy_backend(self):
+        try:
+            self.scrcpy_capabilities = self.scrcpy.capabilities()
+        except Exception as err:
+            self.logger.warning("Could not detect scrcpy version: {}".format(err))
+            return
+
+        version = self.scrcpy_capabilities.version
+        if version is None:
+            self.logger.warning("Could not parse scrcpy version output")
+            return
+
+        self.logger.info("Detected scrcpy version: {}".format(version))
+        if not version_at_least(version, (4, 0, 0)):
+            self.display_public_message(
+                "scrcpy {} detected; some scrcpy 4.0 options may be unavailable".format(
+                    ".".join(map(str, version))
+                )
+            )
 
     @property
     def adb(self) -> AndroidDebugBridge:
