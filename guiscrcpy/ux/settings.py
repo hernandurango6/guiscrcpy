@@ -33,6 +33,7 @@ from PyQt5.QtWidgets import (
     QSpinBox,
     QTextEdit,
     QVBoxLayout,
+    QHBoxLayout,
 )
 
 from guiscrcpy.ux import Ui_SettingsWindow
@@ -198,7 +199,15 @@ class InterfaceSettings(QMainWindow, Ui_SettingsWindow):
         text = QTextEdit(dialog)
         text.setReadOnly(True)
         text.setPlainText(output.strip() or "No output")
+        buttons = QHBoxLayout()
+        copy_button = QPushButton("Copy", dialog)
+        close_button = QPushButton("Close", dialog)
+        copy_button.clicked.connect(lambda: text.selectAll() or text.copy())
+        close_button.clicked.connect(dialog.accept)
         layout.addWidget(text)
+        buttons.addWidget(copy_button)
+        buttons.addWidget(close_button)
+        layout.addLayout(buttons)
         dialog.exec_()
 
     @staticmethod
