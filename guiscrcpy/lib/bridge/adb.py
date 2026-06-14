@@ -38,7 +38,7 @@ class AndroidDebugBridge(Bridge):
         open_process(cmd, stdout=PIPE, stderr=PIPE)
 
     def kill_adb_server(self):
-        self.command(self.path, "kill-server")
+        self.command(["kill-server"])
 
     def get_dimensions(self, device_id=None):
         shell_adb = _get_dimension_raw_noexcept(path=self.path, device_id=device_id)
@@ -56,7 +56,7 @@ class AndroidDebugBridge(Bridge):
             )
             self.kill_adb_server()
             if isinstance(device_id, str) and device_id.count(".") >= 3:
-                self.command(self.path, "connect {}".format(device_id))
+                self.command(["connect", device_id])
             shell_adb = _get_dimension_raw_noexcept(path=self.path, device_id=device_id)
             if shell_adb.wait(timeout=8) != 0:
                 self.logger.warning(

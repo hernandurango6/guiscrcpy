@@ -96,7 +96,7 @@ class InterfaceConfig:
                     "the configuration".format(self.config["scrcpy"])
                 )
         if (self.config["scrcpy-server"] is not None) and (
-            platform.System() == "Windows"
+            platform.System().system() == "Windows"
         ):
             os.environ["SCRCPY_SERVER_PATH"] = self.config["scrcpy-server"]
         return True

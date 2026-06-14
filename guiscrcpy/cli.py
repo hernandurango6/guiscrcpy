@@ -1,5 +1,6 @@
 import os
 import platform
+import subprocess
 import sys
 import traceback
 
@@ -317,8 +318,7 @@ def adb_cli(args):
     else:
         adb_path = config["adb"]
     print("Interfacing guiscrcpy-adb")
-    os.system("{} {}".format(adb_path, " ".join(args)))
-    pass
+    subprocess.run([adb_path, *args], check=False)
 
 
 @cli.command()
@@ -332,8 +332,7 @@ def scrcpy(args):
     else:
         scrcpy_path = config["scrcpy"]
     print("Interfacing guiscrcpy-scrcpy")
-    os.system("{} {}".format(scrcpy_path, " ".join(args)))
-    pass
+    subprocess.run([scrcpy_path, *args], check=False)
 
 
 @cli.command("config")

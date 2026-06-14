@@ -145,7 +145,7 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
             self.check_swipe_panel.setChecked(True)
         else:
             self.check_swipe_panel.setChecked(False)
-        if config["panels"].get("tookit"):
+        if config["panels"].get("toolkit"):
             self.check_side_panel.setChecked(True)
         else:
             self.check_side_panel.setChecked(False)
