@@ -34,7 +34,60 @@ The configuration file uses JavaScript Object Notation, to easily retrieve and w
         "/usr/local/bin"
     ],
     "scrcpy": "/usr/bin/scrcpy",
+    "scrcpy_options": {
+        "video_codec": "h265",
+        "max_fps": 60,
+        "audio_source": "playback",
+        "audio_dup": true,
+        "keyboard": "uhid",
+        "mouse": "uhid"
+    },
     "scrcpy-server": null,
     "swtouches": false
+}
+```
+
+## Modern scrcpy options
+
+The `scrcpy_options` object maps directly to supported `scrcpy` command-line
+options. Empty or missing keys are ignored, and the main window controls still
+override their matching legacy options.
+
+Useful examples:
+
+```json
+{
+    "scrcpy_options": {
+        "video_source": "camera",
+        "camera_facing": "front",
+        "camera_size": "1920x1080",
+        "camera_fps": 60,
+        "audio_source": "mic",
+        "record": "camera.mp4"
+    }
+}
+```
+
+```json
+{
+    "scrcpy_options": {
+        "new_display": "1920x1080/420",
+        "flex_display": true,
+        "keep_active": true,
+        "start_app": "org.mozilla.firefox",
+        "video_codec": "h265",
+        "video_bit_rate": "16M"
+    }
+}
+```
+
+```json
+{
+    "scrcpy_options": {
+        "keyboard": "uhid",
+        "mouse": "uhid",
+        "gamepad": "uhid",
+        "otg": false
+    }
 }
 ```
