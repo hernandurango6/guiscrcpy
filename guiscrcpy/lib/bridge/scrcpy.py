@@ -25,8 +25,11 @@ class ScrcpyBridge(Bridge):
         return proc
 
     def version_output(self):
-        proc = open_process([self.path, "--version"], stdout=PIPE, stderr=PIPE)
-        out, err = proc.communicate(timeout=5)
+        return self.run_info(["--version"])
+
+    def run_info(self, args, timeout=15):
+        proc = open_process([self.path] + args, stdout=PIPE, stderr=PIPE)
+        out, err = proc.communicate(timeout=timeout)
         output = out.decode(errors="replace")
         if err:
             output += "\n" + err.decode(errors="replace")

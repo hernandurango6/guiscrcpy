@@ -151,6 +151,26 @@ class ScrcpyOptionsTest(unittest.TestCase):
         self.assertEqual(ScrcpyOptions.from_config(None).to_args(), [])
         self.assertEqual(ScrcpyOptions.from_config({}).to_args(), [])
 
+    def test_builds_list_commands(self):
+        options = ScrcpyOptions(
+            list_apps=True,
+            list_cameras=True,
+            list_camera_sizes=True,
+            list_displays=True,
+            list_encoders=True,
+        )
+
+        self.assertEqual(
+            options.to_args(),
+            [
+                "--list-apps",
+                "--list-cameras",
+                "--list-camera-sizes",
+                "--list-displays",
+                "--list-encoders",
+            ],
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

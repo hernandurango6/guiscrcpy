@@ -28,7 +28,11 @@ from PyQt5.QtWidgets import (
     QLabel,
     QLineEdit,
     QMainWindow,
+    QMessageBox,
+    QPushButton,
     QSpinBox,
+    QTextEdit,
+    QVBoxLayout,
 )
 
 from guiscrcpy.ux import Ui_SettingsWindow
@@ -115,6 +119,10 @@ class InterfaceSettings(QMainWindow, Ui_SettingsWindow):
         self.gamepad_mode = QComboBox(self.modern_group)
         self.gamepad_mode.addItems(["", "uhid", "aoa", "disabled"])
         self.otg = QCheckBox("OTG", self.modern_group)
+        self.list_apps_button = QPushButton("Apps", self.modern_group)
+        self.list_cameras_button = QPushButton("Cameras", self.modern_group)
+        self.list_displays_button = QPushButton("Displays", self.modern_group)
+        self.list_encoders_button = QPushButton("Encoders", self.modern_group)
 
         layout.addWidget(QLabel("Video source"), 0, 0)
         layout.addWidget(self.video_source, 0, 1)
@@ -152,12 +160,46 @@ class InterfaceSettings(QMainWindow, Ui_SettingsWindow):
         layout.addWidget(QLabel("Gamepad"), 6, 4)
         layout.addWidget(self.gamepad_mode, 6, 5)
         layout.addWidget(self.otg, 7, 0)
+        layout.addWidget(QLabel("List from device"), 7, 1)
+        layout.addWidget(self.list_apps_button, 7, 2)
+        layout.addWidget(self.list_cameras_button, 7, 3)
+        layout.addWidget(self.list_displays_button, 7, 4)
+        layout.addWidget(self.list_encoders_button, 7, 5)
 
     def init(self):
         self._load_scrcpy4_options()
         self.updatebutton.clicked.connect(self.complete)
         self.a6d1.clicked.connect(self.file_chooser)
+        self.list_apps_button.clicked.connect(
+            lambda: self._show_scrcpy_info("Apps", ["--list-apps"])
+        )
+        self.list_cameras_button.clicked.connect(
+            lambda: self._show_scrcpy_info("Cameras", ["--list-cameras"])
+        )
+        self.list_displays_button.clicked.connect(
+            lambda: self._show_scrcpy_info("Displays", ["--list-displays"])
+        )
+        self.list_encoders_button.clicked.connect(
+            lambda: self._show_scrcpy_info("Encoders", ["--list-encoders"])
+        )
         self.show()
+
+    def _show_scrcpy_info(self, title, args):
+        try:
+            output = self.parent.scrcpy.run_info(args)
+        except Exception as err:
+            QMessageBox.warning(self, title, "Could not run scrcpy: {}".format(err))
+            return
+
+        dialog = QDialog(self)
+        dialog.setWindowTitle(title)
+        dialog.resize(720, 420)
+        layout = QVBoxLayout(dialog)
+        text = QTextEdit(dialog)
+        text.setReadOnly(True)
+        text.setPlainText(output.strip() or "No output")
+        layout.addWidget(text)
+        dialog.exec_()
 
     @staticmethod
     def _set_combo(combo, value):
