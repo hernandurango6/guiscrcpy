@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, fields
 from typing import List, Optional
 
 
@@ -130,6 +130,20 @@ class ScrcpyOptions:
     list_displays: bool = False
     list_encoders: bool = False
     print_fps: bool = False
+
+    @classmethod
+    def from_config(cls, config: Optional[dict]) -> "ScrcpyOptions":
+        """Create options from the persisted scrcpy_options config section."""
+        if not config:
+            return cls()
+
+        allowed_fields = {field.name for field in fields(cls)}
+        kwargs = {
+            key: value
+            for key, value in config.items()
+            if key in allowed_fields and value is not None
+        }
+        return cls(**kwargs)
 
     def validate(self) -> None:
         _validate_choice("video_codec", self.video_codec, _VIDEO_CODECS)

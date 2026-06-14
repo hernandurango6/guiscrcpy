@@ -945,7 +945,7 @@ class InterfaceGuiscrcpy(QMainWindow, Ui_MainWindow):
 
         # 1: reset
         self.options = ""
-        scrcpy_options = ScrcpyOptions()
+        scrcpy_options = ScrcpyOptions.from_config(self.config.get("scrcpy_options"))
         progress = self.progress(0)
         self.__reset_message_box_stylesheet()
 

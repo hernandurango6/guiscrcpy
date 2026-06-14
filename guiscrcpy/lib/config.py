@@ -50,6 +50,7 @@ class InterfaceConfig:
             "dispRO": False,
             "extra": "",
             "cmx": "",
+            "scrcpy_options": {},
             "device": {},
             "theme": "Breeze",
         }

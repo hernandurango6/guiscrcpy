@@ -121,6 +121,36 @@ class ScrcpyOptionsTest(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "serial cannot"):
             ScrcpyOptions(serial="abc123", tcpip="192.168.1.20").to_args()
 
+    def test_loads_options_from_config_section(self):
+        options = ScrcpyOptions.from_config(
+            {
+                "video_source": "camera",
+                "camera_facing": "back",
+                "audio_source": "mic",
+                "new_display": "1280x720",
+                "flex_display": True,
+                "unknown_future_key": "ignored",
+            }
+        )
+
+        self.assertEqual(
+            options.to_args(),
+            [
+                "--video-source",
+                "camera",
+                "--audio-source",
+                "mic",
+                "--camera-facing",
+                "back",
+                "--new-display=1280x720",
+                "--flex-display",
+            ],
+        )
+
+    def test_empty_config_section_uses_defaults(self):
+        self.assertEqual(ScrcpyOptions.from_config(None).to_args(), [])
+        self.assertEqual(ScrcpyOptions.from_config({}).to_args(), [])
+
 
 if __name__ == "__main__":
     unittest.main()
